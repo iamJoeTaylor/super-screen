@@ -4,15 +4,18 @@ const program = require('commander');
 const co = require('co');
 const prompt = require('co-prompt');
 const request = require('superagent');
+const writeImagesForConfig = require('./browser.js');
+const {createImageDiffs, createImages} = require('./diffImages.js');
 
 function list(val) {
   return val.split(',');
 }
 
 const PERISCOPE_AVATAR = 'https://pbs.twimg.com/profile_images/576529332580982785/pfta069p_400x400.png';
-const THEMES = 'sparkle,ripple,rainbow';
+const THEMES = 'sparkle,ripple,rainbow,wave';
 
 const THEME_ENDPOINT = 'https://payman.periscope.tv/api/v1/giftHeartStyles';
+
 
 program
   .version('1.0.0')
@@ -39,24 +42,38 @@ co(function *() {
     }
   }
 
+
   makeSuperScreen({ themes, avatar })
+  //   .then(makeDiff)
+  // makeDiff({ themes })
+    .then(makeImages)
     .then(() => {
       // Success Exit
       process.exit(0);
     });
 });
 
+const getThemeConfig = ({ themes }) => request
+  .get(THEME_ENDPOINT)
+  .query({ styles: themes.join(',') })
+  .then(({ body }) => body && body.styles);
+
 const makeSuperScreen = ({
   themes,
   avatar
 }) => co(function *() {
   const config = yield getThemeConfig({ themes });
-
+  const promises = config.map(style => writeImagesForConfig(style, avatar));
+  return Promise.all(promises)
+    .then(() => ({ themes }));
 });
 
-const getThemeConfig = ({ themes }) => request
-  .get(THEME_ENDPOINT)
-  .query({ styles: themes.join(',') })
-  .then(({ body }) => {
-    if (body && body.styles) return body.styles;
-  });
+function makeImages({ themes }) {
+  const diffPromises = themes.map(theme => createImages({ theme }));
+  return Promise.all(diffPromises);
+};
+
+function makeDiff({ themes }) {
+  const diffPromises = themes.map(theme => createImageDiffs({ theme }));
+  return Promise.all(diffPromises);
+};

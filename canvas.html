@@ -1,0 +1,123 @@
+<html>
+  <body>
+    <canvas id="canvas"></canvas>
+    <script>
+
+      const colorParticipants = {
+        "Orange": "rgb(245, 166, 35)",
+        "Purple": "rgb(171, 112, 212)",
+        "Green": "rgb(153, 206, 98)",
+        "Periwinkle": "rgb(92, 117, 220)",
+        "Red": "rgb(213, 77, 129)",
+        "Yellow": "rgb(222, 213, 105)",
+        "Teal": "rgb(94, 213, 177)",
+        "Pink": "rgb(230, 151, 220)",
+        "Brown": "rgb(146, 100, 62)",
+        "VividTangerine": "rgb(255, 169, 138)",
+        "SkyBlue": "rgb(132, 225, 235)",
+        "Fern": "rgb(105, 171, 99)",
+        "Carnation": "rgb(248, 91, 91)",
+        // "Default": "rgb(64, 77, 82)"
+      };
+      const themeFactory = (styleJson, { canvas, color, avatarImage }) => {
+        const { Animation, ColorLayer, Layer, MaskLayer } = animationComposition.default;
+        const layers = [];
+
+        canvas = canvas || document.querySelector('#canvas');
+        color = color || (() => {
+          const keys = Object.keys(colorParticipants);
+          const randomKey = Math.floor(Math.random() * keys.length);
+          return colorParticipants[keys[randomKey]];
+        })();
+
+        canvas.width = styleJson.image_width * 2;
+        canvas.height = styleJson.image_height * 2;
+
+        /* participantLayer */
+        if (styleJson.images.fill_sprites && styleJson.images.fill_sprites['xhdpi']) {
+          const colorLayer = new ColorLayer({ color });
+          const fill = new Layer({
+            sprite: {
+              sheet: styleJson.images.fill_sprites['xhdpi'],
+              size: styleJson.image_width * 2,
+              frames: styleJson.animation_framecount,
+            },
+          });
+          const participantLayer = new MaskLayer({ mask: fill, layers: [ colorLayer ]});
+
+          layers.push(participantLayer);
+        }
+
+        /* avatarLayer */
+        if (styleJson.images.mask_sprites && styleJson.images.mask_sprites['xhdpi']) {
+          const avatarMask = new Layer({
+            sprite: {
+              sheet: styleJson.images.mask_sprites['xhdpi'],
+              size: styleJson.image_width * 2,
+              frames: styleJson.animation_framecount,
+            },
+          });
+          const avatarImageLayer = new Layer({
+            images: [ avatarImage ],
+            size: {
+              width: styleJson.avatar_width * 2,
+              height: styleJson.avatar_height * 2,
+              x: styleJson.avatar_origin_x * 2,
+              y: styleJson.avatar_origin_y * 2,
+            },
+          });
+          const avatarLayer = new MaskLayer({ mask: avatarMask, layers: [ avatarImageLayer ]});
+
+          layers.push(avatarLayer);
+        }
+
+        /* borderLayer */
+        if (styleJson.images.border_sprites && styleJson.images.border_sprites['xhdpi']) {
+          const borderLayer = new Layer({
+            sprite: {
+              sheet: styleJson.images.border_sprites['xhdpi'],
+              size: styleJson.image_width * 2,
+              frames: styleJson.animation_framecount,
+            },
+          });
+
+          layers.push(borderLayer);
+        }
+
+        const animation = new Animation({
+          paused: true,
+          canvas,
+          layers,
+        });
+
+        return animation;
+      };
+
+      function callNext(animation) {
+        return new Promise(resolve => {
+            setTimeout(() => {
+              animation.next();
+              resolve(animation);
+            });
+        });
+      }
+
+      window.getImages = (config, opts) => new Promise(async (resolve, reject) => {
+        const animation = themeFactory(config, opts);
+        const images = [];
+
+        setTimeout(async () => {
+          await callNext(animation);
+
+          // TODO: missing frames here;;;;;
+          while (animation.frameIndex > 1) {
+            images.push(animation.canvas.toDataURL().replace(/^data:image\/\w+;base64,/, ""));
+            await callNext(animation);
+          }
+
+          resolve(images);
+        }, 5000);
+      });
+    </script>
+  </body>
+</html>
